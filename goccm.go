@@ -4,7 +4,7 @@ import "sync/atomic"
 
 type (
 	// ConcurrencyManager Interface
-	ConcurrencyManager interface {
+	IConcurrencyManager interface {
 		// Wait until a slot is available for the new goroutine.
 		Wait()
 
@@ -21,7 +21,7 @@ type (
 		RunningCount() int32
 	}
 
-	concurrencyManager struct {
+	ConcurrencyManager struct {
 		// The number of goroutines that are allowed to run concurrently
 		max int
 
@@ -43,9 +43,9 @@ type (
 )
 
 // New concurrencyManager
-func New(maxGoRoutines int) *concurrencyManager {
+func New(maxGoRoutines int) *ConcurrencyManager {
 	// Initiate the manager object
-	c := concurrencyManager{
+	c := ConcurrencyManager{
 		max:       maxGoRoutines,
 		managerCh: make(chan interface{}, maxGoRoutines),
 		doneCh:    make(chan bool),
@@ -65,7 +65,7 @@ func New(maxGoRoutines int) *concurrencyManager {
 
 // Create the controller to collect all the jobs.
 // When a goroutine is finished, we can release a slot for another goroutine.
-func (c *concurrencyManager) controller() {
+func (c *ConcurrencyManager) controller() {
 	for {
 		// This will block until a goroutine is finished
 		<-c.doneCh
@@ -75,7 +75,7 @@ func (c *concurrencyManager) controller() {
 
 		// When the closed flag is set,
 		// we need to close the manager if it doesn't have any running goroutine
-		if c.closed == true && c.runningCount == 0 {
+		if c.closed && c.runningCount == 0 {
 			break
 		}
 	}
@@ -86,7 +86,7 @@ func (c *concurrencyManager) controller() {
 
 // Wait until a slot is available for the new goroutine.
 // A goroutine have to start after this function.
-func (c *concurrencyManager) Wait() {
+func (c *ConcurrencyManager) Wait() {
 
 	// Try to receive from the manager channel. When we have something,
 	// it means a slot is available and we can start a new goroutine.
@@ -98,19 +98,19 @@ func (c *concurrencyManager) Wait() {
 }
 
 // Mark a goroutine as finished
-func (c *concurrencyManager) Done() {
+func (c *ConcurrencyManager) Done() {
 	// Decrease the number of running count
 	atomic.AddInt32(&c.runningCount, -1)
 	c.doneCh <- true
 }
 
 // Close the manager manually
-func (c *concurrencyManager) Close() {
+func (c *ConcurrencyManager) Close() {
 	c.closed = true
 }
 
 // Wait for all goroutines are done
-func (c *concurrencyManager) WaitAllDone() {
+func (c *ConcurrencyManager) WaitAllDone() {
 	// Close the manager automatic
 	c.Close()
 
@@ -119,6 +119,6 @@ func (c *concurrencyManager) WaitAllDone() {
 }
 
 // Returns the number of goroutines which are running
-func (c *concurrencyManager) RunningCount() int32 {
+func (c *ConcurrencyManager) RunningCount() int32 {
 	return c.runningCount
 }
